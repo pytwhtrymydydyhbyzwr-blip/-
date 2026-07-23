@@ -1,5 +1,5 @@
 import React from 'react';
-import { Flame, BarChart3, Calendar, Settings, Volume2, VolumeX, Sparkles, Plus, Layers, Users, User, LogIn, LogOut, Mic, TrendingUp, Trophy, Award, Bell, MessageSquare } from 'lucide-react';
+import { Flame, BarChart3, Calendar, Settings, Volume2, VolumeX, Sparkles, Plus, Layers, Users, User, LogIn, LogOut, Mic, TrendingUp, Trophy, Award, Bell } from 'lucide-react';
 import { ActiveTab } from '../types';
 import { UserAccount } from '../utils/auth';
 
@@ -206,16 +206,6 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Calendar className="w-3.5 h-3.5 inline ml-1" />
             <span>משימות היום (פיד)</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('whatsapp_chat')}
-            className={`tag-neo ${
-              activeTab === 'whatsapp_chat' ? 'active' : ''
-            }`}
-          >
-            <MessageSquare className="w-3.5 h-3.5 inline ml-1" />
-            <span>צ'אט קהילה</span>
           </button>
 
           <button

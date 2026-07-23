@@ -24,7 +24,6 @@ import { ActiveTab, Habit, HabitCategory, PrivacySettings, Friend, FriendCheer, 
 import { loadHabits, saveHabits, loadProStatus, saveProStatus, loadSoundPreference, saveSoundPreference, toggleHabitLog } from './utils/storage';
 import { UserAccount, getCurrentUser, logoutUser, getUserHabitsKey } from './utils/auth';
 import { SocialView } from './components/SocialView';
-import { WhatsAppChatView } from './components/WhatsAppChatView';
 import { publishHabitCompletionEvent } from './utils/socialStore';
 import { formatISO } from './utils/date';
 
@@ -717,16 +716,6 @@ export default function App() {
               </div>
 
             </div>
-          </div>
-        )}
-
-        {/* WhatsApp Chat View Screen */}
-        {activeTab === 'whatsapp_chat' && (
-          <div className="max-w-5xl mx-auto px-4 py-6">
-            <WhatsAppChatView
-              currentUserName={currentUser?.fullName || 'אני (אתה)'}
-              currentUserAvatar={currentUser?.avatar || '🦸‍♂️'}
-            />
           </div>
         )}
 
