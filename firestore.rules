@@ -1,0 +1,134 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Catch-All Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helper Primitives ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Schema Validation Blueprints ---
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'fullName'])
+        && data.uid is string && data.uid.size() <= 128
+        && data.fullName is string && data.fullName.size() > 0 && data.fullName.size() <= 100
+        && (!('email' in data) || (data.email is string && data.email.size() <= 256))
+        && (!('avatar' in data) || (data.avatar is string && data.avatar.size() <= 1000))
+        && (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 50));
+    }
+
+    function isValidHabit(data) {
+      return data.keys().hasAll(['id', 'userId', 'name', 'category', 'type'])
+        && data.id is string && data.id.size() <= 128
+        && data.userId is string && data.userId == request.auth.uid
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 150
+        && data.category is string && data.category.size() <= 50
+        && data.type is string && data.type.size() <= 50
+        && (!('description' in data) || (data.description is string && data.description.size() <= 500))
+        && (!('unit' in data) || (data.unit is string && data.unit.size() <= 50))
+        && (!('color' in data) || (data.color is string && data.color.size() <= 50))
+        && (!('icon' in data) || (data.icon is string && data.icon.size() <= 50))
+        && (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 50))
+        && (!('archived' in data) || data.archived is bool);
+    }
+
+    function isValidGamificationStats(data) {
+      return data.keys().hasAll(['userId', 'xp', 'level'])
+        && data.userId is string && data.userId == request.auth.uid
+        && data.xp is number && data.xp >= 0
+        && data.level is number && data.level >= 1
+        && (!('unlockedBadgeIds' in data) || (data.unlockedBadgeIds is list && data.unlockedBadgeIds.size() <= 100))
+        && (!('totalEarlyCompletions' in data) || data.totalEarlyCompletions is number)
+        && (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 50));
+    }
+
+    function isValidFeedItem(data) {
+      return data.keys().hasAll(['id', 'userId', 'userName', 'habitName'])
+        && data.id is string && data.id.size() <= 128
+        && data.userId is string && data.userId == request.auth.uid
+        && data.userName is string && data.userName.size() > 0 && data.userName.size() <= 100
+        && data.habitName is string && data.habitName.size() > 0 && data.habitName.size() <= 150
+        && (!('userAvatar' in data) || (data.userAvatar is string && data.userAvatar.size() <= 1000))
+        && (!('category' in data) || (data.category is string && data.category.size() <= 50))
+        && (!('streakCount' in data) || data.streakCount is number)
+        && (!('timestamp' in data) || (data.timestamp is string && data.timestamp.size() <= 100));
+    }
+
+    // --- Collection Security Match Blocks ---
+
+    // Users Collection
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isOwner(userId);
+      allow write: if isValidId(userId) && isOwner(userId) && isValidUser(incoming());
+      allow list: if isSignedIn() && resource.data.uid == request.auth.uid;
+
+      // User Habits Subcollection
+      match /habits/{habitId} {
+        allow get, delete: if isValidId(userId) && isValidId(habitId) && isOwner(userId);
+        allow create, update: if isValidId(userId) && isValidId(habitId) && isOwner(userId) && isValidHabit(incoming());
+        allow list: if isValidId(userId) && isOwner(userId);
+      }
+
+      // User Gamification Stats
+      match /gamification/{docId} {
+        allow get, delete: if isValidId(userId) && isOwner(userId);
+        allow create, update: if isValidId(userId) && isOwner(userId) && isValidGamificationStats(incoming());
+        allow list: if isValidId(userId) && isOwner(userId);
+      }
+    }
+
+    // Social Feed Collection
+    match /feed/{feedItemId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isValidId(feedItemId) && isSignedIn() && isValidFeedItem(incoming());
+      allow delete: if isValidId(feedItemId) && isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // Public Profiles Directory
+    match /public_profiles/{userId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isValidId(userId) && isSignedIn();
+      allow delete: if isValidId(userId) && isSignedIn() && isOwner(userId);
+    }
+
+    // Real-Time Group & Direct WhatsApp Chat Messages
+    match /chats/{chatId}/messages/{msgId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    // WhatsApp Status Stories
+    match /statuses/{statusId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // Test Connection Path (for health/connection verification)
+    match /test/connection {
+      allow read: if true;
+    }
+  }
+}

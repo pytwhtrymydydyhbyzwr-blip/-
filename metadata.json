@@ -1,0 +1,8 @@
+{
+  "name": "Habit Tracker - מעקב הרגלים",
+  "description": "אפליקציה מתקדמת למעקב הרגלים, ניהול רצפים (Streaks), תזכורות וסטטיסטיקה מפורטת",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
