@@ -206,10 +206,7 @@ export interface GamificationStats {
 export type FilterTimeOfDay = 'all' | 'morning' | 'afternoon' | 'evening';
 export type ActiveTab =
   | 'dashboard'
-  | 'whatsapp_chat'
-  | 'challenges_feed'
-  | 'groups_challenges'
-  | 'contacts'
+  | 'social'
   | 'analytics'
   | 'habits_manage'
   | 'settings';
