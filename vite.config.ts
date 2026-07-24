@@ -20,3 +20,7 @@ export default defineConfig(() => {
     },
   };
 });
+export default defineConfig({
+  plugins: [react()],
+  base: '/yedidya/', // שם המאגר המדויק שלך בין סלאשים
+})
