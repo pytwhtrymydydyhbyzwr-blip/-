@@ -5,6 +5,7 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    base: process.env.NODE_ENV === 'production' ? '/yedidya/' : '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
@@ -20,7 +21,3 @@ export default defineConfig(() => {
     },
   };
 });
-export default defineConfig({
-  plugins: [react()],
-  base: '/yedidya/', // שם המאגר המדויק שלך בין סלאשים
-})
