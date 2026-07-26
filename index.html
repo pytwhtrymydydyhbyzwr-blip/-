@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="he" dir="rtl">
   <head>
     <meta charset="UTF-8" />
@@ -7,14 +7,1019 @@
     <meta name="description" content="אפליקציה מתקדמת למעקב הרגלים, ניהול רצפים, תזכורות וסטטיסטיקה" />
     <link rel="icon" type="image/svg+xml" href="./icon.svg" />
     <link rel="manifest" href="./manifest.json" />
-    <title>מעקב הרגלים</title>
+    <title>מעקב הרגלים - Habit Tracker</title>
+
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+
+    <!-- React 18 UMD -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+
+    <!-- Babel Standalone for in-browser JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.4/dist/confetti.browser.min.js"></script>
+
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              gaegu: ['Gaegu', 'cursive'],
+              mono: ['JetBrains Mono', 'monospace'],
+            }
+          }
+        }
+      };
+    </script>
+
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: #f8fafc;
+        color: #0f172a;
+        margin: 0;
+        padding: 0;
+      }
+      .font-gaegu {
+        font-family: 'Gaegu', cursive;
+      }
+      .font-mono {
+        font-family: 'JetBrains Mono', monospace;
+      }
+      .bento-box {
+        background: #ffffff;
+        border: 2px solid #2a221a;
+        box-shadow: 4px 4px 0px #2a221a;
+        border-radius: 1rem;
+        padding: 1.25rem;
+      }
+      .bento-box-accent {
+        background: #ffdf3e;
+        border: 2px solid #2a221a;
+        box-shadow: 4px 4px 0px #2a221a;
+        border-radius: 1rem;
+        padding: 1.25rem;
+      }
+      .streak-circle {
+        width: 110px;
+        height: 110px;
+        border-radius: 50%;
+        background: #ffffff;
+        border: 3px solid #2a221a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 3px 3px 0px #2a221a;
+      }
+      .tag-neo {
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        border: 2px solid #2a221a;
+        background: #ffffff;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #2a221a;
+        transition: all 0.15s ease;
+        cursor: pointer;
+      }
+      .tag-neo:hover, .tag-neo.active {
+        background: #2a221a;
+        color: #ffffff;
+      }
+      .btn-fancy {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border-radius: 0.75rem;
+        border: 2px solid #2a221a;
+        background: #10b981;
+        color: #ffffff;
+        font-weight: 800;
+        box-shadow: 3px 3px 0px #2a221a;
+        transition: all 0.1s ease;
+        cursor: pointer;
+      }
+      .btn-fancy:active {
+        transform: translate(2px, 2px);
+        box-shadow: 1px 1px 0px #2a221a;
+      }
+      .label-neo {
+        display: inline-block;
+        padding: 0.15rem 0.5rem;
+        border-radius: 0.375rem;
+        border: 1.5px solid #2a221a;
+        background: #ffdf3e;
+        font-size: 0.65rem;
+        font-weight: 900;
+        letter-spacing: 0.05em;
+        color: #2a221a;
+      }
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="./src/main.tsx"></script>
+
+    <script type="text/babel">
+      const { useState, useEffect, useMemo, useRef } = React;
+
+      // Sound FX Helper using Web Audio API
+      const soundFX = {
+        enabled: true,
+        audioCtx: null,
+        getAudioContext() {
+          if (!this.audioCtx && typeof window !== 'undefined') {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) this.audioCtx = new AudioCtx();
+          }
+          if (this.audioCtx && this.audioCtx.state === 'suspended') {
+            this.audioCtx.resume();
+          }
+          return this.audioCtx;
+        },
+        playCompleteSound() {
+          if (!this.enabled) return;
+          try {
+            const ctx = this.getAudioContext();
+            if (!ctx) return;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(659.25, ctx.currentTime + 0.15);
+            gain.gain.setValueAtTime(0.15, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.25);
+          } catch (e) {}
+        },
+        playCelebrationSound() {
+          if (!this.enabled) return;
+          try {
+            const ctx = this.getAudioContext();
+            if (!ctx) return;
+            [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+              const osc = ctx.createOscillator();
+              const gain = ctx.createGain();
+              osc.type = 'triangle';
+              osc.frequency.value = freq;
+              gain.gain.setValueAtTime(0.12, ctx.currentTime + idx * 0.08);
+              gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.08 + 0.3);
+              osc.connect(gain);
+              gain.connect(ctx.destination);
+              osc.start(ctx.currentTime + idx * 0.08);
+              osc.stop(ctx.currentTime + idx * 0.08 + 0.3);
+            });
+          } catch (e) {}
+        }
+      };
+
+      // Helper Functions
+      function formatISO(date) {
+        const d = new Date(date);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+
+      function getDayNameHebrew(date) {
+        const days = ['א\'', 'ב\'', 'ג\'', 'ד\'', 'ה\'', 'ו\'', 'ש\''];
+        return days[date.getDay()];
+      }
+
+      function getFormattedDateHebrew(dateStr) {
+        const d = new Date(dateStr);
+        const months = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
+        return `${d.getDate()} ב${months[d.getMonth()]}`;
+      }
+
+      // Icon Component using Lucide
+      function Icon({ name, className = "w-5 h-5", ...props }) {
+        useEffect(() => {
+          if (window.lucide) {
+            window.lucide.createIcons();
+          }
+        }, [name]);
+        return <i data-lucide={name || "check"} className={className} {...props}></i>;
+      }
+
+      // Default Habits Data
+      const INITIAL_HABITS = [
+        {
+          id: 'habit_1',
+          name: 'שתיית 2 ליטר מים',
+          description: 'לשמור על הידרציה גבוהה לאורך כל היום',
+          category: 'health',
+          icon: 'droplet',
+          color: '#3b82f6',
+          frequency: 'daily',
+          type: 'boolean',
+          targetValue: 1,
+          unit: 'ליטר',
+          createdAt: new Date().toISOString(),
+          createdDate: formatISO(new Date()),
+          logs: {
+            [formatISO(new Date())]: { completed: true, value: 1 }
+          }
+        },
+        {
+          id: 'habit_2',
+          name: 'אימון כושר יומי',
+          description: '30 דקות ריצה או אימון כוח',
+          category: 'fitness',
+          icon: 'dumbbell',
+          color: '#10b981',
+          frequency: 'daily',
+          type: 'timer',
+          targetValue: 1800,
+          unit: 'שניות',
+          createdAt: new Date().toISOString(),
+          createdDate: formatISO(new Date()),
+          logs: {}
+        },
+        {
+          id: 'habit_3',
+          name: 'קריאת ספר',
+          description: '15 עמודים לפחות לפני השינה',
+          category: 'learning',
+          icon: 'book-open',
+          color: '#8b5cf6',
+          frequency: 'daily',
+          type: 'numeric',
+          targetValue: 15,
+          unit: 'עמודים',
+          createdAt: new Date().toISOString(),
+          createdDate: formatISO(new Date()),
+          logs: {}
+        },
+        {
+          id: 'habit_4',
+          name: 'מדיטציה ונשימות',
+          description: '10 דקות של שקט נפשי בריכוז',
+          category: 'mindset',
+          icon: 'sparkles',
+          color: '#f59e0b',
+          frequency: 'daily',
+          type: 'boolean',
+          targetValue: 1,
+          unit: 'מפגש',
+          createdAt: new Date().toISOString(),
+          createdDate: formatISO(new Date()),
+          logs: {}
+        }
+      ];
+
+      // Local Storage Loaders
+      function loadHabitsFromStorage() {
+        try {
+          const raw = localStorage.getItem('habit_tracker_items_v2');
+          if (raw) return JSON.parse(raw);
+        } catch (e) {}
+        return INITIAL_HABITS;
+      }
+
+      function saveHabitsToStorage(habits) {
+        try {
+          localStorage.setItem('habit_tracker_items_v2', JSON.stringify(habits));
+        } catch (e) {}
+      }
+
+      // Calculate Streaks
+      function calculateStreak(habit, selectedDate) {
+        let currentStreak = 0;
+        let d = new Date(selectedDate);
+
+        while (true) {
+          const dateStr = formatISO(d);
+          const log = habit.logs && habit.logs[dateStr];
+          if (log && log.completed) {
+            currentStreak++;
+            d.setDate(d.getDate() - 1);
+          } else {
+            break;
+          }
+        }
+        return currentStreak;
+      }
+
+      // --- Header Component ---
+      function Header({ activeTab, setActiveTab, totalStreak, level, xp, soundEnabled, onToggleSound, onOpenCreate, currentUser, onAuth, onOpenBadges }) {
+        return (
+          <header className="bg-white border-b-2 border-[#2a221a] sticky top-0 z-30 shadow-sm">
+            <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+              
+              {/* Logo */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#ffdf3e] border-2 border-[#2a221a] flex items-center justify-center font-gaegu text-2xl font-bold shadow-[2px_2px_0px_#2a221a]">
+                  ⚡
+                </div>
+                <div>
+                  <h1 className="font-gaegu text-2xl font-bold leading-none text-[#2a221a]">
+                    הרגלים טובים
+                  </h1>
+                  <span className="text-[10px] font-bold text-slate-500 tracking-wider">NEO-BENTO HABIT TRACKER</span>
+                </div>
+              </div>
+
+              {/* Navigation Tabs */}
+              <nav className="flex items-center gap-1 bg-slate-100 p-1 border-2 border-[#2a221a] rounded-xl overflow-x-auto no-scrollbar">
+                {[
+                  { id: 'dashboard', label: 'לוח בקרה', icon: 'layout-dashboard' },
+                  { id: 'social', label: 'קהילה', icon: 'users' },
+                  { id: 'analytics', label: 'סטטיסטיקה', icon: 'bar-chart-3' },
+                  { id: 'manage', label: 'ניהול הרגלים', icon: 'list-checks' },
+                  { id: 'settings', label: 'הגדרות', icon: 'settings' },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all ${
+                      activeTab === tab.id
+                        ? 'bg-[#2a221a] text-white shadow-sm'
+                        : 'text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    <Icon name={tab.icon} className="w-3.5 h-3.5" />
+                    <span>{tab.label}</span>
+                  </button>
+                ))}
+              </nav>
+
+              {/* Action Badges & Buttons */}
+              <div className="flex items-center gap-2">
+                
+                {/* Level / XP */}
+                <button
+                  onClick={onOpenBadges}
+                  className="flex items-center gap-1.5 px-2.5 py-1 bg-[#fffbf2] border-2 border-[#2a221a] rounded-xl text-xs font-black shadow-[2px_2px_0px_#2a221a]"
+                >
+                  <span className="text-amber-500">🏆</span>
+                  <span>רמה {level}</span>
+                </button>
+
+                {/* Sound Toggle */}
+                <button
+                  onClick={onToggleSound}
+                  className="p-1.5 bg-white border-2 border-[#2a221a] rounded-xl shadow-[2px_2px_0px_#2a221a] hover:bg-slate-100"
+                  title="צלילים"
+                >
+                  <Icon name={soundEnabled ? "volume-2" : "volume-x"} className="w-4 h-4 text-[#2a221a]" />
+                </button>
+
+                {/* Add Habit Button */}
+                <button onClick={onOpenCreate} className="btn-fancy text-xs py-1.5 px-3">
+                  <Icon name="plus" className="w-4 h-4 stroke-[3]" />
+                  <span>הרגל חדש</span>
+                </button>
+              </div>
+
+            </div>
+          </header>
+        );
+      }
+
+      // --- Date Strip Component ---
+      function DateStrip({ selectedDate, onSelectDate, habits }) {
+        const dates = useMemo(() => {
+          const list = [];
+          const today = new Date();
+          for (let i = -3; i <= 3; i++) {
+            const d = new Date(today);
+            d.setDate(today.getDate() + i);
+            list.push({
+              iso: formatISO(d),
+              dateObj: d,
+              dayName: getDayNameHebrew(d),
+              dayNum: d.getDate(),
+              isToday: i === 0,
+            });
+          }
+          return list;
+        }, []);
+
+        return (
+          <div className="bg-[#fffbf2] border-b-2 border-[#2a221a] py-3">
+            <div className="max-w-7xl mx-auto px-4 flex items-center justify-center gap-2 overflow-x-auto no-scrollbar">
+              {dates.map((item) => {
+                const isSelected = selectedDate === item.iso;
+                return (
+                  <button
+                    key={item.iso}
+                    onClick={() => onSelectDate(item.iso)}
+                    className={`flex flex-col items-center justify-center min-w-[60px] py-2 px-3 rounded-2xl border-2 border-[#2a221a] transition-all ${
+                      isSelected
+                        ? 'bg-[#ffdf3e] shadow-[3px_3px_0px_#2a221a] scale-105 font-black'
+                        : 'bg-white hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className="text-[10px] text-slate-600 font-extrabold">{item.dayName}</span>
+                    <span className="font-gaegu text-xl font-bold leading-none my-0.5">{item.dayNum}</span>
+                    {item.isToday && (
+                      <span className="text-[8px] bg-[#2a221a] text-white px-1 rounded font-bold">היום</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      }
+
+      // --- Habit Card Component ---
+      function HabitCard({ habit, selectedDate, onToggle, onOpenDetail, onOpenTimer, onOpenNumeric }) {
+        const log = habit.logs && habit.logs[selectedDate];
+        const isDone = Boolean(log && log.completed);
+        const streak = calculateStreak(habit, selectedDate);
+
+        return (
+          <div className={`border-2 border-[#2a221a] rounded-2xl p-4 transition-all ${
+            isDone ? 'bg-emerald-50/80 border-emerald-800' : 'bg-white'
+          } shadow-[3px_3px_0px_#2a221a]`}>
+            <div className="flex items-center justify-between gap-3">
+              
+              {/* Checkbox / Toggle */}
+              <button
+                onClick={() => {
+                  if (habit.type === 'timer' && !isDone) {
+                    onOpenTimer(habit);
+                  } else if (habit.type === 'numeric' && !isDone) {
+                    onOpenNumeric(habit);
+                  } else {
+                    onToggle(habit.id, selectedDate, !isDone);
+                  }
+                }}
+                className={`w-9 h-9 rounded-xl border-2 border-[#2a221a] flex items-center justify-center transition-all ${
+                  isDone
+                    ? 'bg-emerald-500 text-white shadow-[1px_1px_0px_#2a221a]'
+                    : 'bg-white text-slate-300 hover:border-emerald-500 hover:text-emerald-500'
+                }`}
+              >
+                <Icon name="check" className="w-5 h-5 stroke-[3]" />
+              </button>
+
+              {/* Title & Category Info */}
+              <div className="flex-1 cursor-pointer" onClick={() => onOpenDetail(habit)}>
+                <div className="flex items-center gap-2">
+                  <h3 className={`font-black text-base ${isDone ? 'line-through text-slate-500' : 'text-[#2a221a]'}`}>
+                    {habit.name}
+                  </h3>
+                  <span className="text-xs">🔥 {streak}</span>
+                </div>
+                {habit.description && (
+                  <p className="text-xs text-slate-500 line-clamp-1">{habit.description}</p>
+                )}
+              </div>
+
+              {/* Type Badge / Open detail */}
+              <div className="flex items-center gap-1">
+                {habit.type === 'timer' && (
+                  <button onClick={() => onOpenTimer(habit)} className="p-1.5 bg-amber-100 border-2 border-[#2a221a] rounded-lg text-xs font-bold">
+                    ⏱️ טיימר
+                  </button>
+                )}
+                {habit.type === 'numeric' && (
+                  <button onClick={() => onOpenNumeric(habit)} className="p-1.5 bg-indigo-100 border-2 border-[#2a221a] rounded-lg text-xs font-bold">
+                    🔢 {log ? log.value || 0 : 0} / {habit.targetValue}
+                  </button>
+                )}
+              </div>
+
+            </div>
+          </div>
+        );
+      }
+
+      // --- Modals ---
+      // Timer Modal
+      function TimerModal({ habit, onClose, onSave }) {
+        const [secondsLeft, setSecondsLeft] = useState(habit.targetValue || 300);
+        const [isRunning, setIsRunning] = useState(false);
+
+        useEffect(() => {
+          let interval = null;
+          if (isRunning && secondsLeft > 0) {
+            interval = setInterval(() => setSecondsLeft((s) => s - 1), 1000);
+          } else if (secondsLeft === 0) {
+            setIsRunning(false);
+            soundFX.playCelebrationSound();
+          }
+          return () => clearInterval(interval);
+        }, [isRunning, secondsLeft]);
+
+        const minutes = Math.floor(secondsLeft / 60);
+        const secs = secondsLeft % 60;
+
+        return (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white border-2 border-[#2a221a] rounded-2xl max-w-sm w-full p-6 shadow-[6px_6px_0px_#2a221a] text-center space-y-4">
+              <h3 className="font-gaegu text-3xl font-bold text-[#2a221a]">{habit.name}</h3>
+              <div className="font-mono text-5xl font-black text-[#2a221a] my-4">
+                {String(minutes).padStart(2, '0')}:{String(secs).padStart(2, '0')}
+              </div>
+              <div className="flex justify-center gap-2">
+                <button onClick={() => setIsRunning(!isRunning)} className="btn-fancy">
+                  {isRunning ? 'השהה' : 'התחל'}
+                </button>
+                <button onClick={() => { onSave(habit.targetValue - secondsLeft); onClose(); }} className="btn-fancy bg-indigo-600">
+                  סים ושמור
+                </button>
+                <button onClick={onClose} className="px-4 py-2 border-2 border-[#2a221a] rounded-xl font-bold">
+                  סגור
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Create/Edit Habit Modal
+      function HabitModal({ habitToEdit, onClose, onSave }) {
+        const [name, setName] = useState(habitToEdit ? habitToEdit.name : '');
+        const [description, setDescription] = useState(habitToEdit ? habitToEdit.description : '');
+        const [category, setCategory] = useState(habitToEdit ? habitToEdit.category : 'health');
+        const [type, setType] = useState(habitToEdit ? habitToEdit.type : 'boolean');
+        const [targetValue, setTargetValue] = useState(habitToEdit ? habitToEdit.targetValue : 1);
+
+        const handleSubmit = (e) => {
+          e.preventDefault();
+          if (!name.trim()) return;
+          const newHabit = {
+            id: habitToEdit ? habitToEdit.id : `habit_${Date.now()}`,
+            name,
+            description,
+            category,
+            type,
+            targetValue: Number(targetValue) || 1,
+            frequency: 'daily',
+            icon: 'sparkles',
+            color: '#10b981',
+            createdAt: habitToEdit ? habitToEdit.createdAt : new Date().toISOString(),
+            createdDate: habitToEdit ? habitToEdit.createdDate : formatISO(new Date()),
+            logs: habitToEdit ? habitToEdit.logs : {}
+          };
+          onSave(newHabit);
+          onClose();
+        };
+
+        return (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white border-2 border-[#2a221a] rounded-2xl max-w-md w-full p-6 shadow-[6px_6px_0px_#2a221a] space-y-4">
+              <h3 className="font-gaegu text-3xl font-bold text-[#2a221a]">
+                {habitToEdit ? 'עריכת הרגל' : 'הרגל חדש'}
+              </h3>
+              <form onSubmit={handleSubmit} className="space-y-3 text-right">
+                <div>
+                  <label className="block text-xs font-bold mb-1">שם ההרגל</label>
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="לדוגמה: לשתות מים"
+                    className="w-full p-2 border-2 border-[#2a221a] rounded-xl font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold mb-1">תיאור</label>
+                  <input
+                    type="text"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="תיאור קצר..."
+                    className="w-full p-2 border-2 border-[#2a221a] rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold mb-1">קטגוריה</label>
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full p-2 border-2 border-[#2a221a] rounded-xl font-bold"
+                  >
+                    <option value="health">בריאות</option>
+                    <option value="fitness">כושר</option>
+                    <option value="mindset">מיינדסט</option>
+                    <option value="productivity">עבודה</option>
+                    <option value="learning">למידה</option>
+                  </select>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button type="submit" className="btn-fancy flex-1">שמור הרגל</button>
+                  <button type="button" onClick={onClose} className="px-4 py-2 border-2 border-[#2a221a] rounded-xl font-bold">ביטול</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      }
+
+      // Badges Modal
+      function BadgesModal({ isOpen, onClose }) {
+        if (!isOpen) return null;
+        const badges = [
+          { id: '1', title: 'צעד ראשון', desc: 'השלמת הרגל ראשון באפליקציה', icon: '🌟', unlocked: true },
+          { id: '2', title: 'להבה חמה', desc: 'רצף של 3 ימים ברציפות', icon: '🔥', unlocked: true },
+          { id: '3', title: 'מאסטר התמדה', desc: 'רצף מטורף של 7 ימים', icon: '🏆', unlocked: false },
+          { id: '4', title: 'ציפור מוקדמת', desc: 'השלמת הרגל לפני 09:00 בבוקר', icon: '🌅', unlocked: true },
+        ];
+
+        return (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white border-2 border-[#2a221a] rounded-2xl max-w-md w-full p-6 shadow-[6px_6px_0px_#2a221a] space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="font-gaegu text-3xl font-bold">הישגים ותגים</h3>
+                <button onClick={onClose} className="font-bold text-lg">✕</button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {badges.map((b) => (
+                  <div key={b.id} className={`p-3 border-2 border-[#2a221a] rounded-xl text-center ${b.unlocked ? 'bg-amber-100' : 'bg-slate-100 opacity-60'}`}>
+                    <div className="text-3xl mb-1">{b.icon}</div>
+                    <div className="font-bold text-sm">{b.title}</div>
+                    <div className="text-[10px] text-slate-600">{b.desc}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // --- Views ---
+      // Social View Component
+      function SocialView() {
+        const [messages, setMessages] = useState([
+          { id: 1, user: 'דניאל כהן', avatar: '👨‍💻', text: 'השלמתי אימון כושר יומי! 💪', time: 'לפני 10 דקות' },
+          { id: 2, user: 'עדי לוי', avatar: '🧘‍♀️', text: 'מדיטציה של 15 דקות בבוקר 🌅', time: 'לפני שעה' },
+        ]);
+        const [text, setText] = useState('');
+
+        const handleSend = (e) => {
+          e.preventDefault();
+          if (!text.trim()) return;
+          setMessages([{ id: Date.now(), user: 'אני', avatar: '🦸‍♂️', text, time: 'כרגע' }, ...messages]);
+          setText('');
+          confetti({ particleCount: 30, spread: 60 });
+        };
+
+        return (
+          <div className="space-y-6">
+            <div className="bento-box space-y-4">
+              <span className="label-neo">COMMUNITY FEED</span>
+              <h2 className="font-gaegu text-3xl font-bold">פיד קהילתי ועידוד הדדי</h2>
+              
+              <form onSubmit={handleSend} className="flex gap-2">
+                <input
+                  type="text"
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  placeholder="שתף את ההישג שלך היום..."
+                  className="flex-1 p-2 border-2 border-[#2a221a] rounded-xl font-bold"
+                />
+                <button type="submit" className="btn-fancy">פרסם</button>
+              </form>
+
+              <div className="space-y-3 pt-2">
+                {messages.map((m) => (
+                  <div key={m.id} className="p-3 border-2 border-[#2a221a] rounded-xl bg-slate-50 flex items-center gap-3">
+                    <div className="text-2xl">{m.avatar}</div>
+                    <div className="flex-1">
+                      <div className="font-bold text-sm">{m.user} <span className="text-[10px] text-slate-500">{m.time}</span></div>
+                      <div className="text-xs text-slate-700">{m.text}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Analytics View Component
+      function AnalyticsView({ habits }) {
+        const totalCompleted = habits.reduce((acc, h) => {
+          return acc + Object.values(h.logs || {}).filter((l) => l.completed).length;
+        }, 0);
+
+        return (
+          <div className="space-y-6">
+            <div className="bento-box space-y-4">
+              <span className="label-neo">ANALYTICS & STATS</span>
+              <h2 className="font-gaegu text-3xl font-bold">סטטיסטיקות והתקדמות</h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 border-2 border-[#2a221a] rounded-xl bg-[#fffbf2] text-center">
+                  <span className="text-xs font-bold text-slate-600">סך הרגלים פעילים</span>
+                  <div className="font-gaegu text-4xl font-bold mt-1">{habits.length}</div>
+                </div>
+                <div className="p-4 border-2 border-[#2a221a] rounded-xl bg-emerald-100 text-center">
+                  <span className="text-xs font-bold text-slate-600">סך השלמות שנרשמו</span>
+                  <div className="font-gaegu text-4xl font-bold mt-1">{totalCompleted} 🎉</div>
+                </div>
+                <div className="p-4 border-2 border-[#2a221a] rounded-xl bg-indigo-100 text-center">
+                  <span className="text-xs font-bold text-slate-600">אחוז התמדה כללי</span>
+                  <div className="font-gaegu text-4xl font-bold mt-1">88%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Manage View Component
+      function HabitsManageView({ habits, onOpenCreate, onDelete }) {
+        return (
+          <div className="space-y-6">
+            <div className="bento-box space-y-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <span className="label-neo">MANAGE HABITS</span>
+                  <h2 className="font-gaegu text-3xl font-bold">ניהול כל ההרגלים</h2>
+                </div>
+                <button onClick={onOpenCreate} className="btn-fancy text-xs">הרגל חדש</button>
+              </div>
+
+              <div className="space-y-3">
+                {habits.map((h) => (
+                  <div key={h.id} className="p-3 border-2 border-[#2a221a] rounded-xl bg-white flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-sm">{h.name}</div>
+                      <div className="text-xs text-slate-500">{h.description || 'ללא תיאור'}</div>
+                    </div>
+                    <button onClick={() => onDelete(h.id)} className="px-3 py-1 bg-red-100 border-2 border-[#2a221a] rounded-lg text-xs font-bold text-red-700">
+                      מחק
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Settings View Component
+      function SettingsView({ soundEnabled, onToggleSound }) {
+        return (
+          <div className="space-y-6">
+            <div className="bento-box space-y-4">
+              <span className="label-neo">SETTINGS</span>
+              <h2 className="font-gaegu text-3xl font-bold">הגדרות אפליקציה</h2>
+
+              <div className="p-4 border-2 border-[#2a221a] rounded-xl bg-white flex items-center justify-between">
+                <div>
+                  <div className="font-bold text-sm">אפקטים קוליים</div>
+                  <div className="text-xs text-slate-500">השמעת צלילים בעת השלמת הרגלים והישגים</div>
+                </div>
+                <button onClick={onToggleSound} className="btn-fancy text-xs">
+                  {soundEnabled ? 'פעיל 🔊' : 'מושתק 🔇'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // --- Main App Component ---
+      function App() {
+        const [habits, setHabits] = useState(loadHabitsFromStorage);
+        const [selectedDate, setSelectedDate] = useState(formatISO(new Date()));
+        const [activeTab, setActiveTab] = useState('dashboard');
+        const [filterCategory, setFilterCategory] = useState('all');
+        const [soundEnabled, setSoundEnabled] = useState(true);
+
+        // Modals
+        const [isHabitModalOpen, setIsHabitModalOpen] = useState(false);
+        const [habitToEdit, setHabitToEdit] = useState(null);
+        const [activeTimerHabit, setActiveTimerHabit] = useState(null);
+        const [isBadgesModalOpen, setIsBadgesModalOpen] = useState(false);
+
+        // Save habits when changed
+        const updateHabits = (newHabits) => {
+          setHabits(newHabits);
+          saveHabitsToStorage(newHabits);
+        };
+
+        const handleToggleLog = (habitId, dateStr, forcedCompleted) => {
+          const updated = habits.map((h) => {
+            if (h.id !== habitId) return h;
+            const currentLog = h.logs ? h.logs[dateStr] : null;
+            const isCompleted = forcedCompleted !== undefined ? forcedCompleted : !Boolean(currentLog && currentLog.completed);
+            
+            if (isCompleted) {
+              soundFX.playCompleteSound();
+              confetti({ particleCount: 50, spread: 60 });
+            }
+
+            return {
+              ...h,
+              logs: {
+                ...(h.logs || {}),
+                [dateStr]: { completed: isCompleted, value: 1 }
+              }
+            };
+          });
+          updateHabits(updated);
+        };
+
+        const handleSaveHabit = (savedHabit) => {
+          const exists = habits.some((h) => h.id === savedHabit.id);
+          if (exists) {
+            updateHabits(habits.map((h) => (h.id === savedHabit.id ? savedHabit : h)));
+          } else {
+            updateHabits([savedHabit, ...habits]);
+          }
+        };
+
+        const handleDeleteHabit = (id) => {
+          updateHabits(habits.filter((h) => h.id !== id));
+        };
+
+        const totalStreak = Math.max(...habits.map((h) => calculateStreak(h, selectedDate)), 0);
+
+        const filteredHabits = habits.filter((h) => {
+          if (filterCategory === 'all') return true;
+          return h.category === filterCategory;
+        });
+
+        const completedCount = habits.filter((h) => h.logs && h.logs[selectedDate] && h.logs[selectedDate].completed).length;
+
+        return (
+          <div dir="rtl" className="min-h-screen bg-slate-50 text-slate-900 pb-12">
+            
+            <Header
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              totalStreak={totalStreak}
+              level={3}
+              xp={240}
+              soundEnabled={soundEnabled}
+              onToggleSound={() => {
+                soundFX.enabled = !soundEnabled;
+                setSoundEnabled(!soundEnabled);
+              }}
+              onOpenCreate={() => {
+                setHabitToEdit(null);
+                setIsHabitModalOpen(true);
+              }}
+              onOpenBadges={() => setIsBadgesModalOpen(true)}
+            />
+
+            <main className="max-w-7xl mx-auto px-4 py-6">
+              
+              {activeTab === 'dashboard' && (
+                <div className="space-y-6">
+                  <DateStrip
+                    selectedDate={selectedDate}
+                    onSelectDate={setSelectedDate}
+                    habits={habits}
+                  />
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    {/* Main Feed */}
+                    <div className="lg:col-span-2 bento-box space-y-5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b-2 border-[#2a221a]/20">
+                        <div>
+                          <span className="label-neo mb-1">{selectedDate} / DAILY JOURNAL</span>
+                          <h2 className="font-gaegu text-3xl sm:text-4xl font-bold text-[#2a221a]">
+                            משימות היום ({completedCount}/{habits.length})
+                          </h2>
+                        </div>
+
+                        {/* Filters */}
+                        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+                          {[
+                            { id: 'all', label: 'הכל' },
+                            { id: 'health', label: 'בריאות' },
+                            { id: 'fitness', label: 'כושר' },
+                            { id: 'mindset', label: 'מיינדסט' },
+                            { id: 'learning', label: 'למידה' },
+                          ].map((cat) => (
+                            <button
+                              key={cat.id}
+                              onClick={() => setFilterCategory(cat.id)}
+                              className={`tag-neo text-xs ${filterCategory === cat.id ? 'active' : ''}`}
+                            >
+                              {cat.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Habit Cards */}
+                      <div className="space-y-3">
+                        {filteredHabits.map((habit) => (
+                          <HabitCard
+                            key={habit.id}
+                            habit={habit}
+                            selectedDate={selectedDate}
+                            onToggle={handleToggleLog}
+                            onOpenDetail={() => {}}
+                            onOpenTimer={(h) => setActiveTimerHabit(h)}
+                            onOpenNumeric={() => {}}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Sidebar */}
+                    <div className="space-y-6 flex flex-col">
+                      <div className="bento-box-accent flex flex-col items-center justify-center text-center p-6">
+                        <div className="streak-circle">
+                          <span className="font-gaegu text-5xl font-bold text-[#2a221a] leading-none">
+                            {totalStreak}🔥
+                          </span>
+                        </div>
+                        <p className="label-neo mt-4">STREAK CONSISTENCY</p>
+                      </div>
+
+                      <div className="bento-box text-center p-6 space-y-3">
+                        <span className="label-neo">PROGRESS</span>
+                        <div className="font-gaegu text-4xl font-bold">
+                          {habits.length > 0 ? Math.round((completedCount / habits.length) * 100) : 0}%
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'social' && <SocialView />}
+              {activeTab === 'analytics' && <AnalyticsView habits={habits} />}
+              {activeTab === 'manage' && (
+                <HabitsManageView
+                  habits={habits}
+                  onOpenCreate={() => {
+                    setHabitToEdit(null);
+                    setIsHabitModalOpen(true);
+                  }}
+                  onDelete={handleDeleteHabit}
+                />
+              )}
+              {activeTab === 'settings' && (
+                <SettingsView
+                  soundEnabled={soundEnabled}
+                  onToggleSound={() => setSoundEnabled(!soundEnabled)}
+                />
+              )}
+
+            </main>
+
+            {/* Modals */}
+            {isHabitModalOpen && (
+              <HabitModal
+                habitToEdit={habitToEdit}
+                onClose={() => setIsHabitModalOpen(false)}
+                onSave={handleSaveHabit}
+              />
+            )}
+
+            {activeTimerHabit && (
+              <TimerModal
+                habit={activeTimerHabit}
+                onClose={() => setActiveTimerHabit(null)}
+                onSave={() => handleToggleLog(activeTimerHabit.id, selectedDate, true)}
+              />
+            )}
+
+            <BadgesModal
+              isOpen={isBadgesModalOpen}
+              onClose={() => setIsBadgesModalOpen(false)}
+            />
+
+          </div>
+        );
+      }
+
+      // Render React App
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App />);
+    </script>
+
+    <!-- Service Worker Registration -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -26,4 +1031,3 @@
     </script>
   </body>
 </html>
-
